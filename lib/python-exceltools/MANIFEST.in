@@ -1,0 +1,4 @@
+include *.txt
+include *.xll
+include tox.ini
+recursive-include docs *.txt

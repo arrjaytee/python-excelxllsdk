@@ -1,0 +1,22 @@
+[project]
+name = "python-ExcelXLLSDK"
+version = "0.dev0"
+dependencies = ["mock", "argh", "multimethod", "comtypes", "python-exceltools"]
+license = "LICENSE.txt"
+requires-python = ">=3.11"
+
+[project.scripts]
+pyxcel = "pyxcel.__main__:main"
+
+[project.entry-points.excel_addins]
+pthon_builtins = "ExcelXLLSDK.builtins:DllMain"
+python_unittest = "ExcelXLLSDK.unittest:DllMain"
+ExcelXLLSDK_test = "ExcelXLLSDK.test.test_xll:DllMain"
+_pyxcel = "pyxcel.addin:DllMain"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.backend"
+
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "exceltools/_addin.c" }]
