@@ -13,3 +13,7 @@ dev = [
     "pytest>=9.0.2",
     "xlwings>=0.33.20",
 ]
+
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "exceltools/_addin.c" }]
+

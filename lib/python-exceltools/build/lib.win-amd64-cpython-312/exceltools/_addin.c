@@ -319,5 +319,5 @@ PyInit__addin(void)
 	return PyModule_Create(&_addin_module_def);
 }
 
-#pragma comment(linker, "/export:xlAutoOpen")
-int WINAPI xlAutoOpen(void) { return 1; }
+#pragma comment(linker, "/export:xlAutoOpen@0=xlAutoOpen")
+int __declspec(dllexport) WINAPI xlAutoOpen(void) { return 1; }

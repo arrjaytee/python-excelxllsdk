@@ -9,10 +9,4 @@ setup(
         Extension("exceltools._addin", ["exceltools/_addin.c"]),
     ],
     packages=find_packages(),
-    package_data={"": ["*.xll"]},
-    entry_points={
-        "console_scripts": [
-            "excel_entry_points = exceltools.entrypoints:write_entry_points"
-        ]
-    },
 )
