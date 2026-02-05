@@ -1,12 +1,9 @@
-from __future__ import absolute_import
-# pylint: disable=C0103,E0602,R0903,W0614,W0401,W0212,W0621
 import sys
 import ctypes
 import logging
 from ctypes import c_int, POINTER, cast, pointer, byref
 
 from ExcelXLLSDK.xltypes import (
-    XLOPER4, LPXLOPER4, OPER4,
     XLOPER12, LPXLOPER12, OPER12
 )
 import ExcelXLLSDK.gen.xlerr
@@ -15,6 +12,11 @@ import ExcelXLLSDK.gen.xlcall
 
 from ExcelXLLSDK.gen.xltype import *
 from ExcelXLLSDK.gen.xlret import *
+
+
+OPER = OPER12
+XLOPER = XLOPER12
+LPXLOPER = LPXLOPER12
 
 _log = logging.getLogger(__name__)
 
@@ -92,20 +94,9 @@ def _is_excel():
     return filename.value.endswith('\\EXCEL.EXE')
 
 if not _is_excel():
-    xlver = 0    
+    def Excel(*_):
+        raise NoExcelError()
 else:
-    _XLCallVer = ctypes.cdll.XLCALL32.XLCallVer
-    _XLCallVer.restype = ctypes.c_int32
-    _XLCallVer.argtypes = []
-    try:
-        xlver = {0x0500: 11, 0x0C00: 12}[_XLCallVer()]
-    except KeyError:
-        _log.warning('unrecognised excel version')
-        xlver = 0
-
-_log.info('xlver = %d', xlver)
-
-if xlver >= 12:
     # Excel12v is really a wrapper  around MdCallBack12, which is (unconventionally)
     # exported from EXCEL.EXE, so we do our own thing to load up the module
     _EXCEL = ctypes.windll.kernel32.GetModuleHandleA(None)
@@ -136,55 +127,9 @@ if xlver >= 12:
         return res
 
     Excel = Excel12
-    OPER = OPER12
-    XLOPER = XLOPER12
-    LPXLOPER = LPXLOPER12
+
 
     _log.info('Excel12 callback in use')
-
-elif xlver >= 11:
-    _Excel4v = ctypes.windll.XLCALL32.Excel4v
-    _Excel4v.restype = c_int
-    _Excel4v.argtypes = [c_int, LPXLOPER4, c_int, POINTER(LPXLOPER4)]
-    _Excel4v.errcheck = _xlret_errcheck
-
-    # convenient wrapper on Excel4 function
-    def Excel4(xlfn, *args):
-        """translate arguments to XLOPERS and invoke the Excel4 API"""
-        # pylint: disable=W0142
-
-        if len(args) > 30:
-            raise ExcelError('Too many arguments for Excel4')
-
-        if len(args) == 0:
-            rgx = (LPXLOPER4 * 1)()
-        else:
-            opers = [arg if isinstance(arg, XLOPER4) else XLOPER4(arg) for arg in args]
-            rgx = (LPXLOPER4 * len(opers))(*[cast(pointer(xloper), LPXLOPER4) for xloper in opers])
-
-        res = XLOPER4()
-        _Excel4v(xlfn, byref(res), len(args), rgx)
-
-        if res.xltype in (xltypeStr, xltypeRef, xltypeBigData, xltypeMulti):
-            res.xltype |= xlbitXLFree
-
-        return res
-
-    Excel = Excel4
-    OPER = OPER4
-    XLOPER = XLOPER4
-    LPXLOPER = LPXLOPER4
-
-    _log.info('Excel4 callback in use')
-
-else:
-    _log.info('Excel not found')
-
-    def Excel(*_):
-        raise NoExcelError()
-    XLOPER = XLOPER12
-    LPXLOPER = LPXLOPER12
-    OPER = OPER12
 
 def _make_err(xlerr):
     res = XLOPER()

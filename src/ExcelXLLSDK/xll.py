@@ -16,8 +16,6 @@ from pelib import PEExportDict
 
 from ExcelXLLSDK.XLCALL import (
     OPER, XLOPER,
-    OPER4, XLOPER4, LPXLOPER4, 
-    OPER12, XLOPER12, LPXLOPER12,
     ExcelError, UncalcedError,
     xlfRegister, xlGetName,
     xlfGetWorkspace, xlCoerce,
@@ -32,7 +30,7 @@ from ExcelXLLSDK.gen.xltype import xlbitDLLFree, xlbitXLFree, xltypeInt
 from ExcelXLLSDK.XLCALL import xlver
 
 from ExcelXLLSDK._ctypes_win32 import (
-    DisableThreadLibraryCalls, 
+    DisableThreadLibraryCalls,
     DLL_PROCESS_ATTACH
 )
 
@@ -46,7 +44,7 @@ _xlTrue = XLOPER(True)
 _xlFalse = XLOPER(False)
 
 
-def _xlResult(value):        
+def _xlResult(value):
     """
     convert a return value into an XLOPER, caching in a dict so that it
     is not garbage collected until we get the xlAutoFree callback.
@@ -54,15 +52,15 @@ def _xlResult(value):
     if value is None: return addressof(_xlNone)
     if value is True: return addressof(_xlTrue)
     if value is False: return addressof(_xlFalse)
-    
+
     if isinstance(value, GeneratorType):
         rows, columns = xlfCaller().size
         gen = value
-        value = XLOPER()              
+        value = XLOPER()
         value._set_Multi(rows, columns, gen)
 
     if not isinstance(value, XLOPER):
-        value = XLOPER(value)              
+        value = XLOPER(value)
 
     if value.xltype & xlbitXLFree:
         _log.warning("returning XL allocated data to excel? %d" % sys.getrefcount(value))
@@ -76,9 +74,6 @@ def _xlResult(value):
     return addressof(value)
 
 
-def xlAutoFree(pxFree):
-    del _pxAutoFree[pxFree]
-    
 def xlAutoFree12(pxFree):
     del _pxAutoFree[pxFree]
 
@@ -93,8 +88,6 @@ _argtypes = {
     str: ('C', ctypes.c_char_p, lambda x: str(x)),
     unicode: ('C%', ctypes.c_wchar_p, lambda x: unicode(x)),
     bool: ('A', ctypes.c_short, lambda x: True if x else False),
-    OPER4: ('P', ctypes.c_long, OPER4.from_address),
-    XLOPER4: ('R', ctypes.c_long, XLOPER4.from_address),
     OPER12: ('Q', ctypes.c_long, OPER12.from_address),
     XLOPER12: ('U', ctypes.c_long, XLOPER12.from_address)
 }
@@ -107,7 +100,7 @@ def _argtype(type):
     # otherwise treat as an XLOPER, and defer to the XLOPER.to function
     code, ctype, conv = _argtypes[XLOPER]
     return (code, ctype, lambda x : XLOPER.from_address(x).value)
- 
+
 class NullContext(object):
     """
     null context handler as a default
@@ -127,7 +120,7 @@ class XLLFunction(object):
         """
         setup initial xlfRegister parameters from the python function definition
         """
-        # function to invoke - we can wrap this with logging, exception 
+        # function to invoke - we can wrap this with logging, exception
         # translation later on.
         self.func = func
         self.context = context
@@ -162,7 +155,7 @@ class XLLFunction(object):
 
         # result is always an oper pointer
         self.result_TypeText = _argtype(OPER)[0]
-       
+
         # infer types of arguments from python default values, and assume
         # OPER values for the rest
         types = map(type, argspec.defaults) if argspec.defaults else []
@@ -172,7 +165,7 @@ class XLLFunction(object):
         self.TypeText = []
         self.argtypes = []
         self.argconvs = []
-    
+
         # populate the initial array representing argument details with defaults
         for code, argtype, argconv in map(_argtype, types):
             self.TypeText.append(code)
@@ -222,7 +215,7 @@ class XLLFunction(object):
 
     @property
     def entry_point(self):
-        """ 
+        """
         construct the ctypes callback to expose to excel
         """
         if not hasattr(self, '_procedure'):
@@ -244,9 +237,9 @@ def xlarg(name, default=None, type=None, help=None):
 class XLLModule(object):
     def __init__(self, Category=None, AddInManagerInfo=None, context=NullContext(), thread_safe=False):
         """
-        setup xll module, default is to use this instance to implement 
+        setup xll module, default is to use this instance to implement
         methods.
-        """        
+        """
         self.hInstDll = None
         self.registered = []
         self.Category = Category
@@ -305,28 +298,28 @@ class XLLModule(object):
 
     def DllMain(self, hInstDll, fdwReason, lpvReserved):
         """
-        DllMain function to import into embedded xll which sets 
-        up xlAutoOpen 
+        DllMain function to import into embedded xll which sets
+        up xlAutoOpen
         This allows the object to provide an entry point for the addin dll.
         """
         _log.debug( 'DllMain(0x%08X %d, 0x%08X)' %  (hInstDll, fdwReason, lpvReserved))
 
         if self.hInstDll is None:
             self.hInstDll = hInstDll
-        
-        if self.hInstDll != hInstDll:
-            raise RuntimeError('XLLModule.DllMain called with wrong hInstDll') 
 
-        # install the thunk - should this pass back tot he module? 
+        if self.hInstDll != hInstDll:
+            raise RuntimeError('XLLModule.DllMain called with wrong hInstDll')
+
+        # install the thunk - should this pass back tot he module?
         if fdwReason == DLL_PROCESS_ATTACH:
             DisableThreadLibraryCalls(hInstDll)
             thunk = PEExportDict.from_handle(hInstDll, readonly=False)
-                
+
             thunk['xlAutoAdd'] = WINFUNCTYPE(c_int)(self.xlAutoAdd)
-            thunk['xlAutoClose'] = WINFUNCTYPE(c_int)(self.xlAutoClose)        
-            thunk['xlAutoOpen'] = WINFUNCTYPE(c_int)(self.xlAutoOpen)            
+            thunk['xlAutoClose'] = WINFUNCTYPE(c_int)(self.xlAutoClose)
+            thunk['xlAutoOpen'] = WINFUNCTYPE(c_int)(self.xlAutoOpen)
             thunk['xlAutoRemove'] = WINFUNCTYPE(c_int)(self.xlAutoRemove)
-            
+
             if xlver >= 12:
                 thunk['xlAddInManagerInfo12'] = WINFUNCTYPE(c_int, LPXLOPER12)(self.xlAddInManagerInfo)
                 thunk['xlAutoRegister12'] = WINFUNCTYPE(c_int, LPXLOPER12)(self.xlAutoRegister)
@@ -335,9 +328,9 @@ class XLLModule(object):
                 thunk['xlAddInManagerInfo'] = WINFUNCTYPE(c_int, LPXLOPER4)(self.xlAddInManagerInfo)
                 thunk['xlAutoRegister'] = WINFUNCTYPE(c_int, LPXLOPER4)(self.xlAutoRegister)
                 thunk['xlAutoFree'] = WINFUNCTYPE(None, c_int)(xlAutoFree)
-            
+
             self.thunk = thunk
-        
+
         return 1
 
     def xleventCalculationEnded(self):
@@ -356,8 +349,8 @@ class XLLModule(object):
         ModuleName = xlGetName()
 
         _log.info("xlAutoOpen: %s", ModuleName)
-        
-        # setup the excel version number accurately - we can't use 
+
+        # setup the excel version number accurately - we can't use
         # xlfGetWorkspace in the module setup.
         ExcelXLLSDK.XLCALL.version = float(xlfGetWorkspace(2))
 
@@ -368,15 +361,15 @@ class XLLModule(object):
         for reg in self.registered:
             if hasattr(reg, 'RegisterId'):
                 _log.warning('{0} has already been registered'.format(reg.FunctionText))
-            
-            # install the dll export 
+
+            # install the dll export
             self.thunk[reg.Procedure] = reg.entry_point
             TypeText = reg.result_TypeText+''.join(reg.TypeText)
-            # NOTE if xlfRegister fails we get False, not and exception      
+            # NOTE if xlfRegister fails we get False, not and exception
             # NOTE add space suffix to ArgumentHelp as excel removes the last char
             reg.RegisterId = xlfRegister(
                 ModuleName,
-                reg.Procedure,            
+                reg.Procedure,
                 TypeText,
                 reg.FunctionText,
                 reg.ArgumentText,
@@ -387,8 +380,8 @@ class XLLModule(object):
                 reg.FunctionHelp+' ',
                 *[ arg+' ' if arg else arg for arg in reg.ArgumentHelp ]
             )
-      
-            # failed to register the function? 
+
+            # failed to register the function?
             if not reg.RegisterId:
                 raise ExcelError('xlfRegister of {0} failed'.format(reg.FunctionText))
 
@@ -401,7 +394,7 @@ class XLLModule(object):
         xlEventRegister(regCalculationCanceled.Procedure, xleventCalculationCanceled)
 
         return 1
-    
+
     def xlAutoRegister(self, pxName):
         """
         unused
@@ -411,8 +404,8 @@ class XLLModule(object):
 
     def xlAutoClose(self):
         """called when the XLL is unloaded
-        
-        however if the shutdown is aborted by a save/cancel then we won't be opened again. 
+
+        however if the shutdown is aborted by a save/cancel then we won't be opened again.
         so we shouldn't do anything here.
         """
         _log.info("xlAutoClose: %s", str(xlGetName()))
@@ -425,10 +418,10 @@ class XLLModule(object):
         _log.info("xlAutoAdd: %s", str(xlGetName()))
         return 1
 
-    def xlAutoRemove():    
+    def xlAutoRemove():
         """
         called when the addin is deselected from the addin list
-        """        
+        """
         _log.info("xlAutoRemove: %s", str(xlGetName()))
         return 1
 
@@ -440,14 +433,14 @@ class XLLModule(object):
 
         # convert to an integer - not sure this is working
         action = xlCoerce(pxAction.contents, xltypeInt)
-        
+
         if int(action) == 1:
             res = self.AddInManagerInfo or repr(self)
             _log.info("xlAddInManagerInfo(%s) = %s" % (repr(pxAction.contents), repr(res)))
             return _xlResult(res)
 
         # should work out the pacakge + versio for the entry point here?
-          
+
         _log.warning("Ignoring xlAddInManagerInfo: %s", repr(pxAction.contents))
         return addressof(xlerrValue)
 
@@ -457,4 +450,3 @@ __all__ = [
     'XLLModule',
     'xlarg',
 ]
-     
